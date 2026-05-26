@@ -8,10 +8,11 @@ const {
   userLogout,
 } = require("../controller/user.controller");
 const authMiddleware = require("../middleware/authMiddleware");
+const limiter = require("../middleware/rateLimiter");
 
 router.post("/user/register", userRegister);
-router.post("/user/login", userLogin);
-router.post("/user/logout", userLogout);
+router.post("/user/login", limiter, userLogin);
+router.post("/user/logout", authMiddleware, userLogout);
 
 router.get("/user/profile", authMiddleware, userProfile);
 
