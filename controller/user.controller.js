@@ -1,6 +1,8 @@
 const User = require("../model/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const Session = require("../model/Session");
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -98,7 +100,19 @@ async function userLogin(req, res) {
     // const token = jwt.sign({ id: user._id }, "Junaid123", { expiresIn: "1h" });
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
-    user.refreshToken.push(refreshToken);
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await Session.create({
+      user: user._id,
+      refreshTokenHash,
+      deviceIP: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
     await user.save();
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -126,16 +140,29 @@ async function userLogout(req, res) {
   try {
     const refreshToken = req.cookies.refreshToken;
 
-    if (refreshToken) {
-      await User.updateOne(
-        { _id: req.user.id },
-        {
-          $pull: {
-            refreshToken: refreshToken,
-          },
-        },
-      );
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Refresh token not found",
+      });
     }
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await Session.findOne({
+      refreshTokenHash,
+      revoked: false,
+    });
+    if (!session) {
+      return res.status(400).json({
+        success: false,
+        message: "Session not found",
+      });
+    }
+    session.revoked = true;
+    await session.save();
 
     res.clearCookie("refreshToken");
 
@@ -167,14 +194,6 @@ async function refreshToken(req, res) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized Token not found",
-      });
-    }
-    const user = await User.findOne({ refreshToken: { $in: [refreshToken] } });
-
-    if (!user) {
-      return res.status(403).json({
-        success: false,
-        message: "Unauthorized Invalid token",
       });
     }
 
