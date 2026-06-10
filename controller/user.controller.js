@@ -3,6 +3,10 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const Session = require("../model/Session");
+const { sendEmail } = require("../services/email.service");
+const { generateOtp, getOptHtml } = require("../utils/utils");
+const Opt = require("../model/Opt");
+
 const {
   generateAccessToken,
   generateRefreshToken,
@@ -42,15 +46,32 @@ async function userRegister(req, res) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await User.create({
+    const user = await User.create({
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
     });
+    const otp = generateOtp();
+    const optHtml = getOptHtml(otp);
+    const opthash = crypto.createHash("sha256").update(otp).digest("hex");
+
+    // Save the OTP to the database
+    await Opt.create({
+      userId: user._id,
+      email: user.email,
+      otp: opthash,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
+    });
+    await sendEmail(email, "Welcome to Our App", optHtml);
 
     return res.status(201).json({
       success: true,
       message: "User create successfully",
+      user: {
+        userId: user._id,
+        email: user.email,
+        verified: user.verified,
+      },
     });
   } catch (error) {
     console.error("REGISTER ERROR:", error);
@@ -81,6 +102,12 @@ async function userLogin(req, res) {
     const user = await User.findOne({ email: normalizedEmail }).select(
       "+password",
     );
+    if (!user.verified) {
+      return res.status(403).json({
+        success: false,
+        message: "Email not verified. Please check your inbox for the OTP.",
+      });
+    }
     if (!user) {
       return res.status(401).json({
         success: false,
