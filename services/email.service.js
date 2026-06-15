@@ -1,5 +1,4 @@
 const nodemailer = require("nodemailer");
-
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -19,14 +18,14 @@ transporter.verify((error, success) => {
   }
 });
 
-const sendEmail = async (to, subject, text) => {
+const sendEmail = async (to, subject, otpHtml) => {
   try {
     const info = await transporter.sendMail({
       from: `Your Name <${process.env.GOOGLE_USER}>`,
       to,
       subject,
-      text,
-      html,
+
+      html: otpHtml, // otpional: You can also send HTML content
     });
     console.log("Email sent:", info.response);
     console.log("Preview URL:", nodemailer.getTestMessageUrl(info));

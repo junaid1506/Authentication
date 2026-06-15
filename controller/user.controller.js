@@ -4,8 +4,8 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const Session = require("../model/Session");
 const { sendEmail } = require("../services/email.service");
-const { generateOtp, getOptHtml } = require("../utils/utils");
-const Opt = require("../model/Opt");
+const { generateOtp, getotpHtml } = require("../utils/utils");
+const OTP = require("../model/Otp");
 
 const {
   generateAccessToken,
@@ -52,17 +52,16 @@ async function userRegister(req, res) {
       password: hashedPassword,
     });
     const otp = generateOtp();
-    const optHtml = getOptHtml(otp);
-    const opthash = crypto.createHash("sha256").update(otp).digest("hex");
+    const otpHtml = getotpHtml(otp);
+    const otphash = crypto.createHash("sha256").update(otp).digest("hex");
 
     // Save the OTP to the database
-    await Opt.create({
+    await OTP.create({
       userId: user._id,
       email: user.email,
-      otp: opthash,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // OTP expires in 5 minutes
+      otp: otphash,
     });
-    await sendEmail(email, "Welcome to Our App", optHtml);
+    await sendEmail(email, "Welcome to Our App", otpHtml);
 
     return res.status(201).json({
       success: true,
@@ -320,6 +319,59 @@ async function refreshToken(req, res) {
   }
 }
 
+async function verifyEmail(req, res) {
+  try {
+    const { otp, email } = req.body;
+
+    if (!otp || !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+    const otpRecord = await OTP.findOne({
+      email: email.toLowerCase(),
+      otp: otpHash,
+    });
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP or email",
+      });
+    }
+    console.log("OTP Record found:", otpRecord);
+    console.log("OTP Record expires at:", otpRecord.userId);
+    const user = await User.findByIdAndUpdate(
+      otpRecord.userId,
+      {
+        verified: true,
+      },
+      { returnDocument: "after" },
+    );
+    console.log("User after update:", user);
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    
+    await OTP.deleteMany({ userId: otpRecord.userId });
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+    });
+  } catch (error) {
+    console.error("VERIFY EMAIL ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+}
 module.exports = {
   userRegister,
   userLogin,
@@ -327,4 +379,5 @@ module.exports = {
   userLogout,
   userLogoutAll,
   refreshToken,
+  verifyEmail,
 };

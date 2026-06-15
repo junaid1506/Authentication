@@ -35,7 +35,7 @@ async function getTodos(req, res) {
     if (req.query.search) {
       filter.title = {
         $regex: req.query.search,
-        $options: "i",
+        $otpions: "i",
       };
     }
     // Completed

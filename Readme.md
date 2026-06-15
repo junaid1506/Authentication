@@ -133,7 +133,7 @@ HTTP Request
   ↓
 Server
   ↓
-Database (optional)
+Database (otpional)
   ↓
 Server
   ↓

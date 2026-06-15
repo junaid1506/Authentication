@@ -2,7 +2,7 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-function getOptHtml(otp) {
+function getotpHtml(otp) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -48,4 +48,4 @@ function getOptHtml(otp) {
 </html>`;
 }
 
-module.exports = { generateOtp, getOptHtml };
+module.exports = { generateOtp, getotpHtml };

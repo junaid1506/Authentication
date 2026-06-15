@@ -5,13 +5,12 @@ const dotenv = require("dotenv");
 const cookies = require("cookie-parser");
 const connectDB = require("./config/db");
 const app = express();
-
+dotenv.config();
 //APIs
 const userRoutes = require("./routes/user.routes");
 const todoRoutes = require("./routes/todo.routes");
 const authMiddleware = require("./middleware/authMiddleware");
 
-dotenv.config();
 app.use(express.json());
 app.use(cookies());
 

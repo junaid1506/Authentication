@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const optSchema = new mongoose.Schema({
+const otpSchema = new mongoose.Schema({
   email: {
     type: String,
     required: [true, "Email is required"],
@@ -16,10 +16,6 @@ const optSchema = new mongoose.Schema({
     type: String,
     required: [true, "OTP is required"],
   },
-  expiresAt: {
-    type: Date,
-    required: [true, "Expiration time is required"],
-  },
 });
 
-module.exports = mongoose.model("Opt", optSchema);
+module.exports = mongoose.model("OTP", otpSchema);
