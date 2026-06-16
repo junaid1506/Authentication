@@ -1,1026 +1,151 @@
-# Backend Servers, Load Balancing, CPU, RAM & Scaling — Complete Hinglish Guide 🚀
+# Authentication System — Node.js + Express + MongoDB
+
+A production-ready authentication backend built with clean architecture — covering everything from user registration and JWT-based auth to email verification, password reset, and rate limiting.
 
 ---
 
-# Introduction
+## Architecture
 
-Agar tum backend development seekh rahe ho, to ek point pe ye questions almost sabke mind me aate hain:
-
-- Server hota kya hai?
-- Database aur server same hote hain kya?
-- HTTP request kaha jaati hai?
-- Multiple servers kaise bante hain?
-- Load balancer kaise kaam karta hai?
-- CPU high aur RAM full ka matlab kya hota hai?
-- Crash kyu hota hai?
-- Scaling kaise hoti hai?
-- Cloud/VPS actually hota kya hai?
-
-Ye documentation ekdum beginner se leke intermediate level tak sab concepts ko deeply explain karega — Hinglish me, story style me, practical examples ke saath.
-
----
-
-# Chapter 1 — Server Kya Hota Hai?
-
-## Simple Definition
-
-Server ek running program/process hota hai jo:
-
-1. Request receive karta hai
-2. Request process karta hai
-3. Response return karta hai
-
----
-
-## Example
-
-Tum browser me likhte ho:
-
-```txt
-youtube.com
 ```
-
-Browser request bhejta hai:
-
-```http
-GET /
-```
-
-Server:
-
-- request receive karta hai
-- process karta hai
-- response bhejta hai
-
----
-
-# Express Example
-
-```js
-import express from "express";
-
-const app = express();
-
-app.get("/", (req, res) => {
-  res.send("Hello World");
-});
-
-app.listen(3000);
+├── config/         # DB connection & environment setup
+├── controller/     # Auth logic (register, login, logout, reset)
+├── middleware/     # JWT verification, auth guards
+├── model/          # Mongoose User schema
+├── routes/         # API route definitions
+├── services/       # Email service (Nodemailer)
+└── utils/          # Helper functions & token utilities
 ```
 
 ---
 
-## Isme Kya Ho Raha Hai?
+## Tech Stack
 
-```txt
-Browser
-  ↓
-Request
-  ↓
-Node.js Server
-  ↓
-Response
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js |
+| Framework | Express.js v5 |
+| Database | MongoDB + Mongoose |
+| Auth | JWT (jsonwebtoken) |
+| Password Hashing | bcrypt |
+| Email | Nodemailer |
+| Security | express-rate-limit, cookie-parser |
+| Config | dotenv |
+
+---
+
+## Features
+
+- User Registration with hashed passwords (bcrypt)
+- Login with JWT token issued via HTTP-only cookie
+- Protected routes using custom auth middleware
+- Email verification on signup (Nodemailer)
+- Forgot password & reset password flow via email token
+- Rate limiting on auth endpoints to prevent brute force attacks
+- Clean separation of concerns — controller / service / middleware / utils layers
+
+---
+
+## API Endpoints
+
+### Auth Routes
+
+```
+POST   /api/auth/register          Register new user
+POST   /api/auth/login             Login & receive JWT cookie
+POST   /api/auth/logout            Clear auth cookie
+GET    /api/auth/verify-email      Verify email via token
+POST   /api/auth/forgot-password   Send password reset email
+POST   /api/auth/reset-password    Reset password via token
+GET    /api/auth/me                Get current user (protected)
 ```
 
 ---
 
-# Chapter 2 — Request & Response Deep Dive
+## JWT Flow
 
-## Request (req)
-
-Request object me:
-
-- headers
-- params
-- body
-- query
-- cookies
-
-sab hota hai.
-
-Example:
-
-```js
-req.body
-req.params
-req.query
 ```
-
----
-
-## Response (res)
-
-Response object se:
-
-- data bhejte hain
-- JSON bhejte hain
-- status codes bhejte hain
-
-Example:
-
-```js
-res.json({ message: "Success" });
-```
-
----
-
-# Real Flow
-
-```txt
 Client
-  ↓
-HTTP Request
-  ↓
-Server
-  ↓
-Database (otpional)
-  ↓
-Server
-  ↓
-HTTP Response
-  ↓
-Client
+  │
+  ├── POST /login  ──────────────────► Server
+  │                                      │
+  │                                  Verify credentials
+  │                                      │
+  │                                  Sign JWT
+  │                                      │
+  │◄── Set-Cookie: token=<jwt> ─────────┘
+  │
+  ├── GET /protected (cookie auto-sent)
+  │
+  │                              Middleware verifies JWT
+  │                                      │
+  │◄── 200 OK + protected data ─────────┘
 ```
 
 ---
 
-# Chapter 3 — Server Aur Database Same Hain Kya?
+## Password Reset Flow
 
-## Nahi 😄
+```
+User → POST /forgot-password
+         │
+         ├── Generate reset token (JWT / crypto)
+         ├── Save hashed token to DB
+         └── Send email with reset link (Nodemailer)
 
-Dono alag cheezein hain.
-
-| Thing | Purpose |
-|---|---|
-| Server | Logic run karta hai |
-| Database | Data store karta hai |
-
----
-
-# Real Life Example
-
-## Server = Waiter
-
-- order leta hai
-- kitchen se baat karta hai
-- response deta hai
-
-## Database = Storage Room
-
-- data save rakhta hai
-- users
-- passwords
-- todos
-- products
-
----
-
-# Login Example
-
-## Step 1
-
-Client login request bhejta hai:
-
-```http
-POST /login
+User clicks link → POST /reset-password
+         │
+         ├── Validate token
+         ├── Hash new password (bcrypt)
+         └── Update DB + invalidate token
 ```
 
 ---
 
-## Step 2
+## Security Practices
 
-Server database se poochta hai:
-
-```txt
-"Is email ka user exist karta hai?"
-```
-
----
-
-## Step 3
-
-Database user return karta hai.
+- Passwords hashed using `bcrypt` (never stored in plain text)
+- JWT stored in HTTP-only cookie (not accessible via `document.cookie`)
+- Auth endpoints protected with `express-rate-limit` — limits brute force attempts
+- Environment variables managed via `dotenv` (no secrets in codebase)
+- Token expiry enforced on both access tokens and reset tokens
 
 ---
 
-## Step 4
-
-Server password compare karta hai.
-
----
-
-## Step 5
-
-Server JWT return karta hai.
-
----
-
-# Chapter 4 — CPU Kya Hota Hai?
-
-CPU = Brain 🧠
-
-Ye calculations karta hai.
-
----
-
-## CPU Kya-Kya Karta Hai?
-
-- loops
-- JWT verify
-- password hashing
-- conditions
-- calculations
-- JavaScript execution
-
----
-
-# Example
-
-```js
-bcrypt.compare(password, hash)
-```
-
-Ye CPU-heavy operation hai.
-
----
-
-# CPU High Kya Hota Hai?
-
-Jab bahut zyada calculations ek saath ho rahi ho.
-
-Example:
-
-```txt
-CPU Usage:
-95%
-100%
-```
-
----
-
-# Symptoms
-
-- app slow
-- lag
-- delayed responses
-- timeout
-
----
-
-# Restaurant Analogy
-
-```txt
-1 cook
-1000 customers 😭
-```
-
-Cook overload.
-
----
-
-# Chapter 5 — RAM Kya Hoti Hai?
-
-RAM = Temporary Memory
-
-Program run hone ke time data RAM me store hota hai.
-
----
-
-# RAM Me Kya Store Hota Hai?
-
-- variables
-- arrays
-- objects
-- requests
-- responses
-- database results
-
----
-
-# Example
-
-```js
-const users = await User.find();
-```
-
-Users RAM me load honge.
-
----
-
-# Visualization
-
-```txt
-Node.js Process
-   ↓
-RAM
- ├── arrays
- ├── objects
- ├── req.body
- ├── JWT payload
- └── functions
-```
-
----
-
-# RAM Full Kaise Hoti Hai?
-
-Suppose:
-
-```js
-await User.find();
-```
-
-Aur database me:
-
-```txt
-5 crore users 😭
-```
-
-Sab RAM me load honge.
-
-RAM explode 💀
-
----
-
-# Isliye Pagination Important Hai
-
-Wrong:
-
-```js
-User.find()
-```
-
-Correct:
-
-```js
-User.find().limit(10)
-```
-
----
-
-# Chapter 6 — SSD / Disk Storage
-
-SSD/HDD permanent storage hoti hai.
-
----
-
-# Yaha Kya Store Hota Hai?
-
-- database files
-- images
-- videos
-- logs
-- backups
-
----
-
-# Difference
-
-| Thing | Type |
-|---|---|
-| RAM | Temporary |
-| SSD | Permanent |
-
----
-
-# Chapter 7 — Crash Kya Hota Hai?
-
-Crash matlab:
-
-> Program unexpectedly band ho gaya.
-
----
-
-# Crash Reasons
-
-## 1. RAM Full
-
-```js
-while(true){
-  arr.push("🔥")
-}
-```
-
-Memory khatam.
-
----
-
-## 2. CPU Overload
-
-```js
-while(true){}
-```
-
-CPU 100%.
-
----
-
-## 3. Unhandled Error
-
-```js
-throw new Error("Oops")
-```
-
-Handle nahi kiya.
-
----
-
-## 4. Too Many Requests
-
-Server overload.
-
----
-
-# Chapter 8 — Storage/RAM/CPU Aata Kaha Se Hai?
-
-Ye sab actual physical hardware hota hai.
-
-Server basically ek powerful computer hota hai.
-
----
-
-# Server Hardware
-
-| Component | Purpose |
-|---|---|
-| CPU | Processing |
-| RAM | Temporary memory |
-| SSD | Permanent storage |
-| Motherboard | Components connect |
-| Network card | Internet |
-
----
-
-# Example
-
-Laptop:
-
-```txt
-8GB RAM
-512GB SSD
-```
-
-Server:
-
-```txt
-128GB RAM
-10TB SSD
-64-core CPU 😭🔥
-```
-
----
-
-# Chapter 9 — Single Server Architecture
-
-Initially:
-
-```js
-app.listen(3000)
-```
-
-Architecture:
-
-```txt
-Users
-  ↓
-Server (3000)
-```
-
----
-
-# Problem
-
-Traffic badh gaya 😭
-
-```txt
-CPU High
-RAM Full
-Slow Response
-Crash
-```
-
----
-
-# Chapter 10 — Multiple Servers Kaise Bante Hain?
-
-Same code ko multiple baar run karo.
-
----
-
-# Example
-
-## Terminal 1
+## Getting Started
 
 ```bash
-PORT=3000 node server.js
+# Clone the repo
+git clone https://github.com/junaid1506/Authentication.git
+cd Authentication
+
+# Install dependencies
+npm install
+
+# Setup environment variables
+cp .env.example .env
+# Fill in MONGO_URI, JWT_SECRET, EMAIL credentials
+
+# Start development server
+npm start
 ```
 
-## Terminal 2
+### .env Variables
 
-```bash
-PORT=3001 node server.js
-```
-
-## Terminal 3
-
-```bash
-PORT=3002 node server.js
-```
-
----
-
-# Result
-
-```txt
-localhost:3000
-localhost:3001
-localhost:3002
-```
-
-3 independent servers.
-
----
-
-# Important
-
-Har server:
-
-- alag process
-- alag memory
-- alag event loop
-
----
-
-# Chapter 11 — Load Balancer Kya Hota Hai?
-
-Load balancer traffic manager hota hai.
-
-Incoming requests ko multiple servers me distribute karta hai.
-
----
-
-# Visualization
-
-```txt
-Users
-   ↓
-Load Balancer
- ↓    ↓    ↓
-S1   S2   S3
+```env
+PORT=5000
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRES_IN=7d
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASS=your_app_password
+CLIENT_URL=http://localhost:3000
 ```
 
 ---
 
-# Common Algorithms
+## Author
 
-## 1. Round Robin
-
-```txt
-Req1 → S1
-Req2 → S2
-Req3 → S3
-```
-
----
-
-## 2. Least Connections
-
-Jis server pe kam load ho.
-
----
-
-## 3. IP Hash
-
-Same user → same server.
-
----
-
-# Chapter 12 — NGINX Example
-
-```nginx
-upstream backend {
-    server localhost:3000;
-    server localhost:3001;
-    server localhost:3002;
-}
-
-server {
-    listen 80;
-
-    location / {
-        proxy_pass http://backend;
-    }
-}
-```
-
----
-
-# Behind The Scenes
-
-NGINX:
-
-- request receive karta hai
-- decide karta hai kis server pe bhejna hai
-
----
-
-# Chapter 13 — Domain Kaise Work Karta Hai?
-
-User browser me likhta hai:
-
-```txt
-google.com
-```
-
----
-
-# DNS
-
-DNS poochta hai:
-
-```txt
-"google.com ka IP kya hai?"
-```
-
----
-
-# Important
-
-Usually:
-
-> Domain load balancer ke IP pe point karta hai.
-
----
-
-# Flow
-
-```txt
-User
- ↓
-Domain
- ↓
-DNS
- ↓
-Load Balancer
- ↓
-Servers
-```
-
----
-
-# Chapter 14 — PM2 Cluster Mode
-
-PM2 production process manager hai.
-
-Official:
-
-https://pm2.keymetrics.io/
-
----
-
-# Install
-
-```bash
-npm install pm2 -g
-```
-
----
-
-# Cluster Mode
-
-```bash
-pm2 start server.js -i max
-```
-
----
-
-# Behind The Scenes
-
-PM2:
-
-- CPU cores detect karta hai
-- multiple Node processes create karta hai
-
----
-
-# Example
-
-8-core CPU:
-
-```txt
-8 Node workers 🔥
-```
-
----
-
-# Chapter 15 — Sessions Problem
-
-Suppose:
-
-User login hua Server-1 pe.
-
-Next request Server-2 pe gayi.
-
-Session missing 😭
-
----
-
-# Solution
-
-## Redis
-
-Shared storage.
-
----
-
-# Chapter 16 — Redis Kya Hota Hai?
-
-Redis fast in-memory database/store hai.
-
-Use cases:
-
-- caching
-- sessions
-- rate limiting
-- queues
-
----
-
-# Example
-
-```txt
-User session
-JWT blacklist
-Rate limit counts
-```
-
----
-
-# Chapter 17 — Rate Limiting
-
-Rate limiting:
-
-> Ek user/IP ko limited requests allow karna.
-
----
-
-# Example
-
-```txt
-5 login attempts / 15 min
-```
-
----
-
-# Why?
-
-- brute force stop
-- spam stop
-- server protection
-
----
-
-# Express Example
-
-```js
-import rateLimit from "express-rate-limit";
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-});
-```
-
----
-
-# Chapter 18 — Real Production Architecture
-
-```txt
-Users
-   ↓
-Cloudflare
-   ↓
-Load Balancer
-   ↓
-Node Servers
-   ↓
-Redis
-   ↓
-MongoDB
-```
-
----
-
-# Chapter 19 — Vertical vs Horizontal Scaling
-
-## Vertical Scaling
-
-Machine powerful banao.
-
-```txt
-4GB → 16GB RAM
-```
-
----
-
-## Horizontal Scaling
-
-More servers add karo.
-
-```txt
-1 server → 10 servers
-```
-
----
-
-# Chapter 20 — Monitoring
-
-Production me companies monitor karti hain:
-
-- CPU usage
-- RAM usage
-- response time
-- requests/sec
-
----
-
-# Popular Tools
-
-- PM2
-- Grafana
-- Datadog
-- New Relic
-
----
-
-# Chapter 21 — Garbage Collector
-
-JavaScript automatically unused memory free karta hai.
-
-Isko bolte hain:
-
-# Garbage Collector
-
----
-
-# Example
-
-```js
-let user = { name: "Junaid" };
-
-user = null;
-```
-
-Old object useless.
-
-GC remove karega.
-
----
-
-# Chapter 22 — Memory Leak
-
-Dangerous issue 😭
-
-Example:
-
-```js
-global.data.push(req.body)
-```
-
-Memory continuously bharne lagegi.
-
----
-
-# Chapter 23 — Event Loop
-
-Node.js single-threaded event loop use karta hai.
-
-Matlab:
-
-- ek main JS thread
-- async operations
-- callbacks
-
----
-
-# Why Node Fast?
-
-Because:
-
-- non-blocking I/O
-- async handling
-- event-driven architecture
-
----
-
-# Chapter 24 — HTTP Basics
-
-## Common Methods
-
-| Method | Purpose |
-|---|---|
-| GET | Data lena |
-| POST | Data bhejna |
-| PUT | Update |
-| DELETE | Remove |
-
----
-
-# Status Codes
-
-| Code | Meaning |
-|---|---|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request |
-| 401 | Unauthorized |
-| 404 | Not Found |
-| 429 | Too Many Requests |
-| 500 | Server Error |
-
----
-
-# Chapter 25 — Final Big Picture
-
-Complete Flow:
-
-```txt
-User
- ↓
-Browser
- ↓
-DNS
- ↓
-Cloudflare/CDN
- ↓
-Load Balancer
- ↓
-Node.js Servers
- ↓
-Redis Cache
- ↓
-MongoDB Database
- ↓
-Response Back
-```
-
----
-
-# Final Summary
-
-## Server
-
-Request receive + response return.
-
----
-
-## Database
-
-Data store.
-
----
-
-## CPU
-
-Calculations/processes.
-
----
-
-## RAM
-
-Temporary memory.
-
----
-
-## SSD
-
-Permanent storage.
-
----
-
-## Crash
-
-Program band ho gaya.
-
----
-
-## Multiple Servers
-
-Same app ko multiple processes/machines pe run karna.
-
----
-
-## Load Balancer
-
-Traffic distribute karna.
-
----
-
-## Scaling
-
-More power/resources add karna.
-
----
-
-# End 🚀
-
+**Mohammad Junaid** — Full Stack MERN Developer  
+[GitHub](https://github.com/junaid1506) · [Portfolio](https://portfolio-junaids-projects-006ff7f4.vercel.app/) · [LinkedIn](https://www.linkedin.com/in/mohammad-junaid-a13275319/)
